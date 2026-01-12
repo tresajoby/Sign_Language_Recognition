@@ -1,0 +1,218 @@
+================================================================================
+PYTHON 3.11 SETUP CHECKLIST
+For ASL Recognition System
+================================================================================
+
+STEP 1: DOWNLOAD PYTHON 3.11
+================================================================================
+
+[ ] Go to: https://www.python.org/downloads/release/python-3119/
+
+[ ] Download: Windows installer (64-bit)
+    File: python-3.11.9-amd64.exe
+    Size: ~27 MB
+
+[ ] Save to: Downloads folder
+
+
+STEP 2: INSTALL PYTHON 3.11
+================================================================================
+
+[ ] Run the downloaded installer (python-3.11.9-amd64.exe)
+
+[ ] ⚠️ IMPORTANT: Check BOTH boxes on first screen:
+    [✓] Install launcher for all users
+    [✓] Add python.exe to PATH
+
+[ ] Click: "Customize installation" (NOT "Install Now")
+
+[ ] Check all Optional Features:
+    [✓] Documentation
+    [✓] pip
+    [✓] tcl/tk and IDLE
+    [✓] Python test suite
+    [✓] py launcher
+    [✓] for all users
+
+[ ] Click: Next
+
+[ ] Check all Advanced Options:
+    [✓] Install for all users
+    [✓] Associate files with Python
+    [✓] Create shortcuts
+    [✓] Add Python to environment variables
+    [✓] Precompile standard library
+
+[ ] Click: Install
+
+[ ] Wait for installation (~2-3 minutes)
+
+[ ] Click: Close
+
+
+STEP 3: VERIFY INSTALLATION
+================================================================================
+
+[ ] Open NEW Command Prompt (Win + R, type "cmd", press Enter)
+
+[ ] Test command:
+    py -3.11 --version
+
+    Expected output: Python 3.11.9
+
+[ ] Test pip:
+    py -3.11 -m pip --version
+
+    Expected output: pip 24.x.x from ... (python 3.11)
+
+[ ] List all Python versions:
+    py --list
+
+    Expected output:
+    -V:3.13 *        Python 3.13.9
+    -V:3.11          Python 3.11.9
+
+
+STEP 4: CREATE VIRTUAL ENVIRONMENT
+================================================================================
+
+[ ] Open Command Prompt
+
+[ ] Navigate to project:
+    cd "C:\Users\Adven\OneDrive\Documents\My files\Sign_Language_Recognition"
+
+[ ] Create virtual environment:
+    py -3.11 -m venv venv
+
+    (Creates a 'venv' folder - takes ~1 minute)
+
+[ ] Activate virtual environment:
+    venv\Scripts\activate
+
+    You should see: (venv) at start of prompt
+
+[ ] Verify Python version:
+    python --version
+
+    Expected: Python 3.11.9
+
+
+STEP 5: INSTALL PACKAGES
+================================================================================
+
+[ ] Make sure (venv) is shown in prompt
+
+[ ] Upgrade pip:
+    python -m pip install --upgrade pip
+
+[ ] Install core packages (one at a time):
+    pip install numpy==1.24.3
+    pip install opencv-python==4.8.1.78
+    pip install mediapipe==0.10.8
+
+[ ] Install TensorFlow:
+    pip install tensorflow==2.15.0
+
+[ ] Install remaining packages:
+    pip install pandas matplotlib seaborn scikit-learn
+
+[ ] Verify MediaPipe:
+    python -c "import mediapipe as mp; print('MediaPipe version:', mp.__version__)"
+
+    Expected: MediaPipe version: 0.10.8
+
+
+STEP 6: TEST SYSTEM
+================================================================================
+
+[ ] Run system test:
+    python test_system_simple.py
+
+[ ] Expected output includes:
+    [OK] Configuration module working
+    [OK] Hand detector initialized
+    [OK] Feature extractor initialized
+    [OK] Static collection script importable
+    [OK] Dynamic collection script importable
+    [SUCCESS] All core components working!
+
+
+TROUBLESHOOTING
+================================================================================
+
+If "py: command not found":
+→ Restart Command Prompt
+→ Reinstall Python 3.11 with "Add to PATH" checked
+
+If MediaPipe import fails:
+→ Make sure venv is activated (see "(venv)" in prompt)
+→ Reinstall: pip uninstall mediapipe && pip install mediapipe==0.10.8
+
+If activation fails:
+→ Try: venv\Scripts\activate.bat
+→ Or use PowerShell: venv\Scripts\Activate.ps1
+
+
+QUICK COMMANDS REFERENCE
+================================================================================
+
+Check version:        py -3.11 --version
+Create venv:          py -3.11 -m venv venv
+Activate venv:        venv\Scripts\activate
+Deactivate venv:      deactivate
+Install package:      pip install package_name
+List packages:        pip list
+
+
+AFTER SETUP - DAILY WORKFLOW
+================================================================================
+
+Every time you work on the project:
+
+1. Open Command Prompt
+
+2. Navigate to project:
+   cd "C:\Users\Adven\OneDrive\Documents\My files\Sign_Language_Recognition"
+
+3. Activate virtual environment:
+   venv\Scripts\activate
+
+4. You should see: (venv) in prompt
+
+5. Now you can run any project commands:
+   - python src/data_collection/collect_static.py
+   - python src/training/train_static.py
+   - python src/inference/realtime_static.py
+   - etc.
+
+6. When done, deactivate:
+   deactivate
+
+
+VERIFICATION CHECKLIST
+================================================================================
+
+Before proceeding with data collection, verify:
+
+[✓] py -3.11 --version          → Shows Python 3.11.9
+[✓] venv folder exists          → In project directory
+[✓] venv\Scripts\activate works → Shows (venv) in prompt
+[✓] python --version            → Shows Python 3.11.9
+[✓] import mediapipe            → No errors
+[✓] test_system_simple.py       → All tests pass
+
+
+YOU'RE READY WHEN:
+================================================================================
+
+✓ All commands above work without errors
+✓ (venv) shows in your command prompt
+✓ test_system_simple.py passes all tests
+✓ MediaPipe version shows 0.10.8
+
+→ NOW YOU CAN START COLLECTING DATA AND TRAINING MODELS! 🚀
+
+
+================================================================================
+Need help? Check INSTALL_PYTHON311.md for detailed instructions
+================================================================================
