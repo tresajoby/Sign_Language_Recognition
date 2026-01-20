@@ -437,19 +437,22 @@ def main():
 
     # Ask user what to collect
     print("What would you like to collect?")
-    print("1. All gestures (A-Z, 0-9)")
-    print("2. Only letters (A-Z)")
-    print("3. Only numbers (0-9)")
+    print("1. All static gestures (A-Y except J,Z + 0-9) - 34 classes")
+    print("2. Only letters (A-Y except J,Z) - 24 classes")
+    print("3. Only numbers (0-9) - 10 classes")
     print("4. Custom selection")
+    print("\nNote: J and Z are dynamic gestures - use collect_dynamic.py for those")
 
     choice = input("\nEnter choice (1-4): ").strip()
 
     if choice == '1':
         gestures = DataCollectionConfig.STATIC_CLASSES
     elif choice == '2':
-        gestures = [chr(i) for i in range(ord('A'), ord('Z') + 1)]
+        # Only letters from config (excludes J and Z)
+        gestures = [g for g in DataCollectionConfig.STATIC_CLASSES if g.isalpha()]
     elif choice == '3':
-        gestures = [str(i) for i in range(10)]
+        # Only numbers from config
+        gestures = [g for g in DataCollectionConfig.STATIC_CLASSES if g.isdigit()]
     elif choice == '4':
         custom = input("Enter gestures (comma-separated): ").strip()
         gestures = [g.strip().upper() for g in custom.split(',')]
