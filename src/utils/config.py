@@ -65,15 +65,19 @@ class MediaPipeConfig:
 class DataCollectionConfig:
     """Configuration for data collection phase"""
 
-    # Static gestures (A-Z letters and 0-9 digits)
+    # Static gestures (A-Z letters EXCEPT J and Z, plus 0-9 digits)
+    # Note: J and Z require movement and are classified as dynamic gestures
     STATIC_CLASSES = [
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-        'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M',
+        'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y',
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
     ]
 
-    # Dynamic gestures (motion-based signs)
+    # Dynamic gestures (motion-based signs including J and Z)
+    # J: draws a "J" shape in the air
+    # Z: draws a "Z" shape in the air
     DYNAMIC_CLASSES = [
+        'J', 'Z',  # Letters with movement
         'hello', 'thanks', 'please', 'sorry', 'yes', 'no',
         'help', 'stop', 'more', 'finish'
     ]

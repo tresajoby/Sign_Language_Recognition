@@ -41,9 +41,17 @@ data/raw/**/*.mp4
 data/raw/**/*.avi
 data/raw/**/*.jpg
 data/raw/**/*.png
+data/raw/**/*.npy
+data/raw/*/
+data/processed/*.npy
+data/labels/*.json
 *.mp4
 *.avi
+*.npy
 !Sign_Lang.mp4
+
+# Collection progress
+collection_progress.json
 
 # But keep .gitkeep files
 !.gitkeep
