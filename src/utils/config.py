@@ -217,7 +217,7 @@ class InferenceConfig:
 
     # Confidence threshold for predictions
     # Only show predictions above this threshold
-    CONFIDENCE_THRESHOLD = 0.7
+    CONFIDENCE_THRESHOLD = 0.4
 
     # Buffer size for dynamic gesture detection
     # Number of frames to collect before making prediction
