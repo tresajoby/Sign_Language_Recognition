@@ -1,3 +1,31 @@
+# Personal / system files
+.claude/
+.claude.json
+.claude.json.backup
+.config/
+.copilot/
+.gitconfig
+.bash_history
+.lesshst
+.matplotlib/
+.node_repl_history
+AppData/
+Contacts/
+Favorites/
+Guitar/
+Links/
+Music/
+OneDrive/
+Saved Games/
+Searches/
+Zotero/
+mercurial.ini
+ntuser.ini
+ntuser.dat*
+NTUSER.DAT*
+nul
+node-v*.msi
+
 # Python
 __pycache__/
 *.py[cod]
