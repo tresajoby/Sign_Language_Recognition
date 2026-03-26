@@ -43,7 +43,8 @@ class RealtimeRecognizer:
             annotated_frame, landmarks = self.detector.detect(frame)
 
             if landmarks:
-                landmark_array = self.detector.get_landmark_array(landmarks)
+                hand = landmarks[0]  # first (and only) hand — list of 21 (x,y,z) tuples
+                landmark_array = self.detector.get_landmark_array(hand)
                 features = self.extractor.extract(landmark_array)
 
                 static_result = self.predictor.predict_static(landmark_array)
@@ -54,7 +55,7 @@ class RealtimeRecognizer:
                     dynamic_result = self.predictor.predict_dynamic(sequence)
 
                 if InferenceConfig.DISPLAY_BBOX:
-                    bbox = self._get_bbox(frame, landmarks)
+                    bbox = self._get_bbox(frame, hand)
                     if bbox:
                         x1, y1, x2, y2 = bbox
                         cv2.rectangle(annotated_frame, (x1, y1), (x2, y2),
