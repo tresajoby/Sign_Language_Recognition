@@ -1,30 +1,10 @@
-# Core Dependencies
-numpy
-pandas
-opencv-python-headless
+tensorflow-cpu==2.18.0
 mediapipe==0.10.14
-
-# Deep Learning
-tensorflow==2.19.0
-keras
-
-# Visualization
+opencv-python-headless
+numpy
+streamlit
+pandas
+Pillow
+scikit-learn
 matplotlib
 seaborn
-
-# Utilities
-scikit-learn
-scipy
-
-# Web Interface
-streamlit
-
-# Progress bars
-tqdm
-
-# Configuration
-pyyaml
-
-# Testing
-pytest
-pytest-cov

@@ -56,13 +56,9 @@ data/raw/**/collection_progress.json
 # Keep .gitkeep files
 !.gitkeep
 
-# Model files (large binaries)
-models/*.h5
+# Model files (large binaries) — .pb and checkpoints excluded, .h5 included for deployment
 models/*.pb
 models/*.ckpt
-models/*.keras
-*.h5
-*.keras
 
 # Logs
 logs/
