@@ -1,14 +1,14 @@
 """
 ASL Recognition System — Streamlit Web App
-Displays evaluation results and runs static gesture inference on uploaded images.
+Evaluation dashboard — no TF/MediaPipe required on cloud.
 """
 
 import numpy as np
+import pandas as pd
 import streamlit as st
 from pathlib import Path
 from PIL import Image
 
-# ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="ASL Recognition System",
     page_icon="🤟",
@@ -18,8 +18,9 @@ st.set_page_config(
 st.title("🤟 ASL Sign Language Recognition System")
 st.caption("MLP (static gestures) · BiLSTM (dynamic gestures) · MediaPipe hand detection")
 
-# ── Tabs ─────────────────────────────────────────────────────────────────────
 tab1, tab2, tab3 = st.tabs(["📊 Evaluation Results", "🖐 Live Demo", "ℹ️ About"])
+
+PLOTS = Path("docs/plots")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TAB 1 — Evaluation Results
@@ -27,223 +28,192 @@ tab1, tab2, tab3 = st.tabs(["📊 Evaluation Results", "🖐 Live Demo", "ℹ️
 with tab1:
     st.header("Model Evaluation Results")
 
-    # ── Summary metrics ──
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Static Model Accuracy", "96.8%", "+29.8% vs baseline")
+    col1.metric("Static Model Accuracy",  "96.8%",  "+29.8% vs baseline")
     col2.metric("Dynamic Model Accuracy", "97.2%")
     col3.metric("MediaPipe Detection FPS", "37.7 FPS")
-    col4.metric("End-to-End Latency", "~124 ms")
+    col4.metric("End-to-End Latency",     "~124 ms")
 
     st.divider()
 
-    # ── Static model ──
+    # ── Static model ──────────────────────────────────────────────────────────
     st.subheader("Static Gesture Model (MLP) — Letters A–Y + Digits 0–9")
 
-    metrics_col, note_col = st.columns([1, 1])
-    with metrics_col:
-        import pandas as pd
-        static_df = pd.DataFrame({
-            "Metric": ["Accuracy", "Weighted Precision", "Weighted Recall",
-                       "Weighted F1", "Macro Precision", "Macro Recall", "Macro F1"],
-            "Value": ["96.80%", "95.36%", "96.80%", "95.88%",
-                      "80.80%", "83.24%", "81.22%"],
-        })
-        st.dataframe(static_df, hide_index=True, use_container_width=True)
-
-    with note_col:
+    m_col, n_col = st.columns(2)
+    with m_col:
+        st.dataframe(pd.DataFrame({
+            "Metric":  ["Accuracy", "Weighted Precision", "Weighted Recall",
+                        "Weighted F1", "Macro Precision", "Macro Recall", "Macro F1"],
+            "Value":   ["96.80%", "95.36%", "96.80%", "95.88%",
+                        "80.80%", "83.24%", "81.22%"],
+        }), hide_index=True, use_container_width=True)
+    with n_col:
         st.info(
-            "**Note on macro vs weighted scores:** Digits 0–9 have only 10 training "
-            "samples each (vs 100 for letters), which lowers macro averages. "
-            "Letters A–Y achieve near-perfect scores individually."
+            "**Note:** Digits 0–9 have only 10 training samples each vs 100 for "
+            "letters, which lowers macro averages. Letters A–Y achieve near-perfect scores."
         )
 
-    plots_dir = Path("docs/plots")
-    cm_static = plots_dir / "confusion_matrix_static.png"
-    pc_static  = plots_dir / "per_class_accuracy_static.png"
-    ea_static  = plots_dir / "error_analysis_static.png"
-
-    if cm_static.exists():
-        c1, c2 = st.columns(2)
-        with c1:
-            st.image(str(cm_static), caption="Confusion Matrix — Static Model")
-        with c2:
-            st.image(str(pc_static), caption="Per-Class Accuracy — Static Model")
-        st.image(str(ea_static), caption="Error Analysis — Static Model")
-    else:
-        st.warning("Run `python -m src.training.evaluate_models` to generate plots.")
+    for img, caption in [
+        ("confusion_matrix_static.png",  "Confusion Matrix — Static Model"),
+        ("per_class_accuracy_static.png","Per-Class Accuracy — Static Model"),
+        ("error_analysis_static.png",    "Error Analysis — Static Model"),
+        ("training_history_static.png",  "Training History — Static MLP"),
+    ]:
+        p = PLOTS / img
+        if p.exists():
+            st.image(str(p), caption=caption)
 
     st.divider()
 
-    # ── Dynamic model ──
-    st.subheader("Dynamic Gesture Model (BiLSTM) — J, Z + 10 Words")
+    # ── Dynamic model ─────────────────────────────────────────────────────────
+    st.subheader("Dynamic Gesture Model (BiLSTM) — J, Z + 10 Common Words")
 
-    dynamic_df = pd.DataFrame({
+    st.dataframe(pd.DataFrame({
         "Metric": ["Accuracy", "Weighted Precision", "Weighted Recall",
                    "Weighted F1", "Macro F1"],
-        "Value": ["97.22%", "97.35%", "97.22%", "97.22%", "97.22%"],
-    })
-    st.dataframe(dynamic_df, hide_index=True, use_container_width=True)
+        "Value":  ["97.22%", "97.35%", "97.22%", "97.22%", "97.22%"],
+    }), hide_index=True, use_container_width=True)
 
-    cm_dynamic = plots_dir / "confusion_matrix_dynamic.png"
-    pc_dynamic  = plots_dir / "per_class_accuracy_dynamic.png"
-    ea_dynamic  = plots_dir / "error_analysis_dynamic.png"
-
-    if cm_dynamic.exists():
-        c1, c2 = st.columns(2)
-        with c1:
-            st.image(str(cm_dynamic), caption="Confusion Matrix — Dynamic Model")
-        with c2:
-            st.image(str(pc_dynamic), caption="Per-Class Accuracy — Dynamic Model")
-        st.image(str(ea_dynamic), caption="Error Analysis — Dynamic Model")
+    for img, caption in [
+        ("confusion_matrix_dynamic.png",  "Confusion Matrix — Dynamic Model"),
+        ("per_class_accuracy_dynamic.png","Per-Class Accuracy — Dynamic Model"),
+        ("error_analysis_dynamic.png",    "Error Analysis — Dynamic Model"),
+        ("training_history_dynamic.png",  "Training History — Dynamic BiLSTM"),
+    ]:
+        p = PLOTS / img
+        if p.exists():
+            st.image(str(p), caption=caption)
 
     st.divider()
 
-    # ── Inference speed ──
+    # ── Per-class breakdown ───────────────────────────────────────────────────
+    st.subheader("Per-Class Results — Static Model (Letters)")
+    letter_data = {
+        "Class": ["A","B","C","D","E","F","G","H","I","K","L","M",
+                  "N","O","P","Q","R","S","T","U","V","W","X","Y"],
+        "Precision": [1.00,0.94,1.00,1.00,1.00,0.83,1.00,1.00,1.00,1.00,
+                      1.00,1.00,1.00,1.00,1.00,0.94,0.88,1.00,1.00,1.00,
+                      1.00,0.88,1.00,1.00],
+        "Recall":    [1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,
+                      1.00,1.00,1.00,1.00,0.93,1.00,1.00,1.00,1.00,0.87,
+                      1.00,1.00,1.00,1.00],
+        "F1":        [1.00,0.97,1.00,1.00,1.00,0.91,1.00,1.00,1.00,1.00,
+                      1.00,1.00,1.00,1.00,0.97,0.97,0.94,1.00,1.00,0.93,
+                      1.00,0.94,1.00,1.00],
+    }
+    st.dataframe(pd.DataFrame(letter_data), hide_index=True, use_container_width=True)
+
+    st.subheader("Per-Class Results — Dynamic Model")
+    dynamic_data = {
+        "Gesture":   ["hello","help","no","please","sorry","thanks","yes","Z",
+                      "J","stop","more","finish"],
+        "Precision": [1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,0.88,0.93,0.87],
+        "Recall":    [1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,0.87,1.00,0.93,0.87],
+        "F1":        [1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,0.93,0.94,0.93,0.87],
+    }
+    st.dataframe(pd.DataFrame(dynamic_data), hide_index=True, use_container_width=True)
+
+    st.divider()
+
+    # ── Benchmark ─────────────────────────────────────────────────────────────
     st.subheader("Inference Speed Benchmark")
-    bench_df = pd.DataFrame({
-        "Component": ["MediaPipe Hand Detection", "Static MLP Inference", "Dynamic BiLSTM Inference"],
+    st.dataframe(pd.DataFrame({
+        "Component": ["MediaPipe Hand Detection",
+                      "Static MLP Inference",
+                      "Dynamic BiLSTM Inference"],
         "Mean Latency (ms)": [26.50, 94.02, 97.11],
-        "Std Dev (ms)": [8.28, 39.28, 16.26],
-        "Throughput (FPS)": [37.73, 10.64, 10.30],
-    })
-    st.dataframe(bench_df, hide_index=True, use_container_width=True)
+        "Std Dev (ms)":      [8.28, 39.28, 16.26],
+        "Throughput (FPS)":  [37.73, 10.64, 10.30],
+    }), hide_index=True, use_container_width=True)
 
     st.divider()
 
-    # ── Training history plots ──
-    st.subheader("Training History")
-    th_static  = plots_dir / "training_history_static.png"
-    th_dynamic = plots_dir / "training_history_dynamic.png"
-    if th_static.exists() or th_dynamic.exists():
-        c1, c2 = st.columns(2)
-        if th_static.exists():
-            with c1:
-                st.image(str(th_static), caption="Training History — Static MLP")
-        if th_dynamic.exists():
-            with c2:
-                st.image(str(th_dynamic), caption="Training History — Dynamic BiLSTM")
+    # ── Top confusion pairs ───────────────────────────────────────────────────
+    st.subheader("Top Misclassifications")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.write("**Static Model**")
+        st.dataframe(pd.DataFrame({
+            "True": ["U","9","6","2","P"],
+            "Predicted": ["R","F","W","3","Q"],
+            "Count": [2,2,2,2,1],
+            "Reason": ["Similar finger shape","Insufficient digit data",
+                       "Insufficient digit data","Insufficient digit data",
+                       "Near-identical pose"],
+        }), hide_index=True, use_container_width=True)
+    with c2:
+        st.write("**Dynamic Model**")
+        st.dataframe(pd.DataFrame({
+            "True": ["J","finish","finish","more"],
+            "Predicted": ["finish","stop","more","stop"],
+            "Count": [2,1,1,1],
+            "Reason": ["Curved motion overlap","Similar trajectory",
+                       "Similar wrist motion","Similar finger motion"],
+        }), hide_index=True, use_container_width=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TAB 2 — Live Demo (image upload)
+# TAB 2 — Live Demo
 # ─────────────────────────────────────────────────────────────────────────────
 with tab2:
-    st.header("Static Gesture Demo")
-    st.write(
-        "Upload a photo of your hand or take one with your webcam. "
-        "The model will detect the hand and predict the ASL letter/digit."
+    st.header("Live Gesture Demo")
+    st.info(
+        "**The real-time webcam demo runs locally only.**  \n"
+        "TensorFlow and MediaPipe cannot be installed on Streamlit Cloud's free tier "
+        "(Python 3.14, no compatible wheels).  \n\n"
+        "**To run the demo on your own machine:**\n"
+        "```bash\n"
+        "git clone https://github.com/tresajoby/Sign_Language_Recognition\n"
+        "cd Sign_Language_Recognition\n"
+        "pip install tensorflow mediapipe opencv-python numpy\n"
+        "python -m src.inference.run\n"
+        "```"
     )
 
-    @st.cache_resource
-    def load_models():
-        try:
-            import mediapipe as mp
-            from src.inference.predictor import Predictor
-            predictor = Predictor()
-            hands = mp.solutions.hands.Hands(
-                static_image_mode=True,
-                max_num_hands=1,
-                min_detection_confidence=0.5,
-            )
-            return predictor, hands
-        except Exception as e:
-            return None, str(e)
-
-    source = st.radio("Input source", ["Upload image", "Use webcam"], horizontal=True)
-
-    img_array = None
-
-    if source == "Upload image":
-        uploaded = st.file_uploader("Upload a hand image", type=["jpg", "jpeg", "png"])
-        if uploaded:
-            img = Image.open(uploaded).convert("RGB")
-            img_array = np.array(img)
+    st.subheader("Demo Screenshot")
+    demo_img = PLOTS / "screenshot_demo.png"
+    if demo_img.exists():
+        st.image(str(demo_img), caption="Real-time ASL recognition running locally")
     else:
-        photo = st.camera_input("Take a photo")
-        if photo:
-            img = Image.open(photo).convert("RGB")
-            img_array = np.array(img)
-
-    if img_array is not None:
-        import cv2
-
-        predictor, hands = load_models()
-
-        if hands is None or isinstance(hands, str):
-            st.error(f"Could not load models: {hands}")
-        else:
-            col_img, col_result = st.columns([1, 1])
-
-            with col_img:
-                st.image(img_array, caption="Input image", use_container_width=True)
-
-            with col_result:
-                results = hands.process(img_array)
-
-                if results.multi_hand_landmarks:
-                    hand_lms = results.multi_hand_landmarks[0]
-                    hand = [(lm.x, lm.y, lm.z) for lm in hand_lms.landmark]
-                    landmark_array = np.array(hand, dtype=np.float32).flatten()
-
-                    prediction = predictor.predict_static(landmark_array)
-
-                    if prediction:
-                        label, confidence = prediction
-                        st.success(f"### Predicted: **{label}**")
-                        st.metric("Confidence", f"{confidence:.1%}")
-                        st.progress(confidence)
-                    else:
-                        st.warning(
-                            "Hand detected but confidence below threshold (40%). "
-                            "Try a clearer, well-lit photo."
-                        )
-
-                    # Show top 5 predictions
-                    from src.preprocessing.feature_extractor import FeatureExtractor
-                    fe = FeatureExtractor()
-                    features = fe.extract(landmark_array).reshape(1, -1)
-                    probs = predictor.static_model.predict(features, verbose=0)[0]
-                    top5_idx = np.argsort(probs)[::-1][:5]
-                    import pandas as pd
-                    top5_df = pd.DataFrame({
-                        "Gesture": [predictor.static_label_encoder.get(i, str(i)) for i in top5_idx],
-                        "Confidence": [f"{probs[i]:.1%}" for i in top5_idx],
-                    })
-                    st.write("**Top 5 predictions:**")
-                    st.dataframe(top5_df, hide_index=True, use_container_width=True)
-
-                else:
-                    st.error(
-                        "No hand detected in the image. "
-                        "Make sure your hand is clearly visible and well-lit."
-                    )
+        st.markdown("""
+        The live system displays:
+        - **Static prediction** (letter/digit) with confidence bar
+        - **Dynamic prediction** (word/motion letter) with confidence bar
+        - **Active mode** indicator (STATIC / DYNAMIC)
+        - **FPS counter** and **sequence buffer** progress
+        - **Hand landmark overlay** drawn by MediaPipe
+        """)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TAB 3 — About
 # ─────────────────────────────────────────────────────────────────────────────
 with tab3:
     st.header("About This System")
-
     st.markdown("""
     ## ASL Recognition System
 
-    This prototype recognises **American Sign Language (ASL)** gestures in real time
-    using a two-model pipeline:
+    A real-time American Sign Language recognition prototype built as part of a
+    final-year thesis project.
 
-    | Component | Model | Classes | Accuracy |
+    ### Models
+
+    | Component | Architecture | Classes | Accuracy |
     |---|---|---|---|
-    | Static gestures | MLP (3 hidden layers) | A–Y (no J/Z), 0–9 | 96.8% |
-    | Dynamic gestures | BiLSTM | J, Z, hello, thanks, please, sorry, yes, no, help, stop, more, finish | 97.2% |
+    | Static gestures | MLP (3 hidden layers) | A–Y (excl. J/Z), 0–9 | **96.8%** |
+    | Dynamic gestures | BiLSTM | J, Z, hello, thanks, please, sorry, yes, no, help, stop, more, finish | **97.2%** |
 
     ### Pipeline
-    1. **MediaPipe Hands** — detects 21 hand landmarks per frame (37.7 FPS)
-    2. **Feature extraction** — wrist-relative normalisation → 63-dim vector
-    3. **Static MLP** — classifies single-frame poses
+    1. **MediaPipe Hands** — detects 21 hand landmarks per frame (~37 FPS)
+    2. **Wrist-relative normalisation** — 63-dimensional feature vector
+    3. **Static MLP** — classifies single-frame hand poses
     4. **BiLSTM** — classifies 30-frame motion sequences
 
     ### Dataset
-    - Static: **100 samples/class** for letters, 10 samples/class for digits
-    - Dynamic: **100 sequences/class** × 30 frames each
+    | Split | Static | Dynamic |
+    |---|---|---|
+    | Train | 1,750 samples | 840 sequences |
+    | Val | 375 samples | 180 sequences |
+    | Test | 375 samples | 180 sequences |
 
     ### Tech Stack
-    - Python 3.11 · TensorFlow 2.21 · MediaPipe 0.10.14 · OpenCV · Streamlit
+    Python 3.11 · TensorFlow 2.21 · Keras 3 · MediaPipe 0.10.14 · OpenCV 4.x · Streamlit
     """)
