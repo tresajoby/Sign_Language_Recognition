@@ -29,8 +29,8 @@ with tab1:
     st.header("Model Evaluation Results")
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Static Model Accuracy",  "96.8%",  "+29.8% vs baseline")
-    col2.metric("Dynamic Model Accuracy", "97.2%")
+    col1.metric("Static Model Accuracy",  "97.37%", "+30.37% vs baseline")
+    col2.metric("Dynamic Model Accuracy", "97.22%")
     col3.metric("MediaPipe Detection FPS", "37.7 FPS")
     col4.metric("End-to-End Latency",     "~124 ms")
 
@@ -44,13 +44,14 @@ with tab1:
         st.dataframe(pd.DataFrame({
             "Metric":  ["Accuracy", "Weighted Precision", "Weighted Recall",
                         "Weighted F1", "Macro Precision", "Macro Recall", "Macro F1"],
-            "Value":   ["96.80%", "95.36%", "96.80%", "95.88%",
-                        "80.80%", "83.24%", "81.22%"],
+            "Value":   ["97.37%", "97.69%", "97.37%", "97.34%",
+                        "97.71%", "97.27%", "97.29%"],
         }), hide_index=True, use_container_width=True)
     with n_col:
         st.info(
-            "**Note:** Digits 0–9 have only 10 training samples each vs 100 for "
-            "letters, which lowers macro averages. Letters A–Y achieve near-perfect scores."
+            "**Dataset:** 34 classes (A–Y excl. J/Z, digits 0–9).  \n"
+            "Each class has **90–100 samples** (3,300 total).  \n"
+            "Train / Val / Test split: **2,309 / 496 / 495** samples."
         )
 
     for img, caption in [
@@ -68,11 +69,19 @@ with tab1:
     # ── Dynamic model ─────────────────────────────────────────────────────────
     st.subheader("Dynamic Gesture Model (BiLSTM) — J, Z + 10 Common Words")
 
-    st.dataframe(pd.DataFrame({
-        "Metric": ["Accuracy", "Weighted Precision", "Weighted Recall",
-                   "Weighted F1", "Macro F1"],
-        "Value":  ["97.22%", "97.35%", "97.22%", "97.22%", "97.22%"],
-    }), hide_index=True, use_container_width=True)
+    d_col, d_info = st.columns(2)
+    with d_col:
+        st.dataframe(pd.DataFrame({
+            "Metric": ["Accuracy", "Weighted Precision", "Weighted Recall",
+                       "Weighted F1", "Macro F1"],
+            "Value":  ["97.22%", "97.35%", "97.22%", "97.22%", "97.22%"],
+        }), hide_index=True, use_container_width=True)
+    with d_info:
+        st.info(
+            "**Dataset:** 12 classes (J, Z, hello, thanks, please, sorry, yes, no, help, stop, more, finish).  \n"
+            "Each class has **100 sequences** (1,200 total).  \n"
+            "Train / Val / Test split: **840 / 180 / 180** sequences."
+        )
 
     for img, caption in [
         ("confusion_matrix_dynamic.png",  "Confusion Matrix — Dynamic Model"),
@@ -87,21 +96,30 @@ with tab1:
     st.divider()
 
     # ── Per-class breakdown ───────────────────────────────────────────────────
-    st.subheader("Per-Class Results — Static Model (Letters)")
+    st.subheader("Per-Class Results — Static Model (Letters A–Y)")
     letter_data = {
-        "Class": ["A","B","C","D","E","F","G","H","I","K","L","M",
-                  "N","O","P","Q","R","S","T","U","V","W","X","Y"],
-        "Precision": [1.00,0.94,1.00,1.00,1.00,0.83,1.00,1.00,1.00,1.00,
-                      1.00,1.00,1.00,1.00,1.00,0.94,0.88,1.00,1.00,1.00,
-                      1.00,0.88,1.00,1.00],
-        "Recall":    [1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,
-                      1.00,1.00,1.00,1.00,0.93,1.00,1.00,1.00,1.00,0.87,
-                      1.00,1.00,1.00,1.00],
-        "F1":        [1.00,0.97,1.00,1.00,1.00,0.91,1.00,1.00,1.00,1.00,
-                      1.00,1.00,1.00,1.00,0.97,0.97,0.94,1.00,1.00,0.93,
+        "Class":     ["A","B","C","D","E","F","G","H","I","K","L","M",
+                      "N","O","P","Q","R","S","T","U","V","W","X","Y"],
+        "Precision": [1.00,1.00,1.00,1.00,1.00,0.88,1.00,1.00,1.00,1.00,
+                      1.00,1.00,1.00,0.78,1.00,1.00,0.79,1.00,1.00,1.00,
                       1.00,0.94,1.00,1.00],
+        "Recall":    [1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,
+                      1.00,1.00,1.00,0.93,1.00,1.00,1.00,1.00,1.00,0.73,
+                      1.00,1.00,1.00,1.00],
+        "F1":        [1.00,1.00,1.00,1.00,1.00,0.94,1.00,1.00,1.00,1.00,
+                      1.00,1.00,1.00,0.85,1.00,1.00,0.88,1.00,1.00,0.85,
+                      1.00,0.97,1.00,1.00],
     }
     st.dataframe(pd.DataFrame(letter_data), hide_index=True, use_container_width=True)
+
+    st.subheader("Per-Class Results — Static Model (Digits 0–9)")
+    digit_data = {
+        "Class":     ["0","1","2","3","4","5","6","7","8","9"],
+        "Precision": [0.90,1.00,1.00,1.00,0.93,1.00,1.00,1.00,1.00,1.00],
+        "Recall":    [0.69,1.00,0.93,1.00,1.00,1.00,0.93,1.00,1.00,0.86],
+        "F1":        [0.78,1.00,0.96,1.00,0.97,1.00,0.96,1.00,1.00,0.92],
+    }
+    st.dataframe(pd.DataFrame(digit_data), hide_index=True, use_container_width=True)
 
     st.subheader("Per-Class Results — Dynamic Model")
     dynamic_data = {
@@ -134,21 +152,23 @@ with tab1:
     with c1:
         st.write("**Static Model**")
         st.dataframe(pd.DataFrame({
-            "True": ["U","9","6","2","P"],
-            "Predicted": ["R","F","W","3","Q"],
-            "Count": [2,2,2,2,1],
-            "Reason": ["Similar finger shape","Insufficient digit data",
-                       "Insufficient digit data","Insufficient digit data",
-                       "Near-identical pose"],
+            "True":      ["U", "0", "9", "O", "6"],
+            "Predicted": ["R", "O", "F", "0", "W"],
+            "Count":     [4,   4,   2,   1,   1],
+            "Reason":    ["Similar finger shape",
+                          "Ambiguous round shape",
+                          "Similar loop shape",
+                          "Ambiguous round shape",
+                          "Similar finger spread"],
         }), hide_index=True, use_container_width=True)
     with c2:
         st.write("**Dynamic Model**")
         st.dataframe(pd.DataFrame({
-            "True": ["J","finish","finish","more"],
-            "Predicted": ["finish","stop","more","stop"],
-            "Count": [2,1,1,1],
-            "Reason": ["Curved motion overlap","Similar trajectory",
-                       "Similar wrist motion","Similar finger motion"],
+            "True":      ["J",     "finish", "finish", "more"],
+            "Predicted": ["finish","stop",   "more",   "stop"],
+            "Count":     [2,       1,        1,        1],
+            "Reason":    ["Curved motion overlap", "Similar trajectory",
+                          "Similar wrist motion",  "Similar finger motion"],
         }), hide_index=True, use_container_width=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -198,8 +218,8 @@ with tab3:
 
     | Component | Architecture | Classes | Accuracy |
     |---|---|---|---|
-    | Static gestures | MLP (3 hidden layers) | A–Y (excl. J/Z), 0–9 | **96.8%** |
-    | Dynamic gestures | BiLSTM | J, Z, hello, thanks, please, sorry, yes, no, help, stop, more, finish | **97.2%** |
+    | Static gestures | MLP (3 hidden layers) | A–Y (excl. J/Z), 0–9 | **97.37%** |
+    | Dynamic gestures | BiLSTM | J, Z, hello, thanks, please, sorry, yes, no, help, stop, more, finish | **97.22%** |
 
     ### Pipeline
     1. **MediaPipe Hands** — detects 21 hand landmarks per frame (~37 FPS)
@@ -210,9 +230,12 @@ with tab3:
     ### Dataset
     | Split | Static | Dynamic |
     |---|---|---|
-    | Train | 1,750 samples | 840 sequences |
-    | Val | 375 samples | 180 sequences |
-    | Test | 375 samples | 180 sequences |
+    | Train | 2,309 samples | 840 sequences |
+    | Val | 496 samples | 180 sequences |
+    | Test | 495 samples | 180 sequences |
+    | **Total** | **3,300 samples** | **1,200 sequences** |
+
+    Samples per class: **90–100** (static) · **100** (dynamic, all classes equal)
 
     ### Tech Stack
     Python 3.11 · TensorFlow 2.21 · Keras 3 · MediaPipe 0.10.14 · OpenCV 4.x · Streamlit
