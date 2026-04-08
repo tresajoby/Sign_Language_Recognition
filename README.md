@@ -178,7 +178,7 @@ python src/inference/realtime_recognizer.py
 
 1. Google MediaPipe: https://mediapipe.dev/
 2. TensorFlow/Keras Documentation: https://www.tensorflow.org/
-3. ASL Research: [Add academic references]
+3. ASL Research
 
 ---
 
@@ -191,7 +191,7 @@ This project is developed for academic purposes as part of an undergraduate thes
 ## 📧 Contact
 
 **Tresa Joby**
-Email: [Your Email]
+Email: tresajoby18@gmail.com
 GitHub: [@tresajoby](https://github.com/tresajoby)
 
 ---
