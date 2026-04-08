@@ -195,9 +195,3 @@ Email: [Your Email]
 GitHub: [@tresajoby](https://github.com/tresajoby)
 
 ---
-
-## 🙏 Acknowledgments
-
-- Thesis Supervisor: [Supervisor Name]
-- [Your University Name], Department of [Your Department]
-- MediaPipe and TensorFlow teams for open-source tools
