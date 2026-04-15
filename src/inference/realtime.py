@@ -11,6 +11,10 @@ from src.preprocessing.feature_extractor import FeatureExtractor
 from src.inference.predictor import Predictor
 
 
+MOTION_THRESHOLD = 0.015   # normalised units; tweak up if too sensitive
+MOTION_HISTORY   = 6       # frames to average displacement over
+
+
 class RealtimeRecognizer:
 
     def __init__(self):
@@ -18,11 +22,25 @@ class RealtimeRecognizer:
         self.extractor = FeatureExtractor()
         self.predictor = Predictor()
         self.buffer = deque(maxlen=DataCollectionConfig.DYNAMIC_SEQUENCE_LENGTH)
+        self._wrist_history = deque(maxlen=MOTION_HISTORY)
 
         if not self.predictor.static_ready:
             print("Static model not loaded")
         if not self.predictor.dynamic_ready:
             print("Dynamic model not loaded")
+
+    def _is_moving(self, wrist_xy):
+        """Return True when average wrist displacement exceeds MOTION_THRESHOLD."""
+        self._wrist_history.append(wrist_xy)
+        if len(self._wrist_history) < 2:
+            return False
+        positions = list(self._wrist_history)
+        displacements = [
+            np.hypot(positions[i][0] - positions[i-1][0],
+                     positions[i][1] - positions[i-1][1])
+            for i in range(1, len(positions))
+        ]
+        return float(np.mean(displacements)) > MOTION_THRESHOLD
 
     def run(self):
         cap = cv2.VideoCapture(DataCollectionConfig.CAMERA_ID)
@@ -31,9 +49,9 @@ class RealtimeRecognizer:
         cap.set(cv2.CAP_PROP_FPS, DataCollectionConfig.FPS)
 
         prev_time = time.time()
-        static_result = None
+        static_result  = None
         dynamic_result = None
-        last_mode = "STATIC"
+        last_mode      = "STATIC"
 
         while True:
             ret, frame = cap.read()
@@ -43,16 +61,25 @@ class RealtimeRecognizer:
             annotated_frame, landmarks = self.detector.detect(frame)
 
             if landmarks:
-                hand = landmarks[0]  # first (and only) hand — list of 21 (x,y,z) tuples
+                hand = landmarks[0]  # first hand — list of 21 (x,y,z) tuples
                 landmark_array = self.detector.get_landmark_array(hand)
                 features = self.extractor.extract(landmark_array)
 
-                static_result = self.predictor.predict_static(landmark_array)
+                # Determine mode from actual wrist motion
+                wrist_xy   = (hand[0][0], hand[0][1])
+                hand_moving = self._is_moving(wrist_xy)
 
-                self.buffer.append(features)
-                if len(self.buffer) == DataCollectionConfig.DYNAMIC_SEQUENCE_LENGTH:
-                    sequence = np.array(self.buffer)
-                    dynamic_result = self.predictor.predict_dynamic(sequence)
+                if hand_moving:
+                    last_mode = "DYNAMIC"
+                    self.buffer.append(features)
+                    if len(self.buffer) == DataCollectionConfig.DYNAMIC_SEQUENCE_LENGTH:
+                        sequence = np.array(self.buffer)
+                        dynamic_result = self.predictor.predict_dynamic(sequence)
+                else:
+                    last_mode = "STATIC"
+                    self.buffer.clear()          # reset buffer when hand is still
+                    dynamic_result = None        # clear stale dynamic result
+                    static_result = self.predictor.predict_static(landmark_array)
 
                 if InferenceConfig.DISPLAY_BBOX:
                     bbox = self._get_bbox(frame, hand)
@@ -60,13 +87,6 @@ class RealtimeRecognizer:
                         x1, y1, x2, y2 = bbox
                         cv2.rectangle(annotated_frame, (x1, y1), (x2, y2),
                                       InferenceConfig.BBOX_COLOR, 2)
-
-            if static_result and dynamic_result:
-                last_mode = "STATIC" if static_result[1] >= dynamic_result[1] else "DYNAMIC"
-            elif static_result:
-                last_mode = "STATIC"
-            elif dynamic_result:
-                last_mode = "DYNAMIC"
 
             now = time.time()
             fps = 1.0 / max(now - prev_time, 1e-6)
