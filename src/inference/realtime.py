@@ -11,8 +11,9 @@ from src.preprocessing.feature_extractor import FeatureExtractor
 from src.inference.predictor import Predictor
 
 
-MOTION_THRESHOLD = 0.015   # normalised units; tweak up if too sensitive
-MOTION_HISTORY   = 6       # frames to average displacement over
+MOTION_THRESHOLD    = 0.012  # normalised units; lower = more sensitive
+MOTION_HISTORY      = 6      # frames to average wrist displacement over
+STILL_FRAMES_RESET  = 20     # consecutive still frames before switching to static
 
 
 class RealtimeRecognizer:
@@ -23,6 +24,7 @@ class RealtimeRecognizer:
         self.predictor = Predictor()
         self.buffer = deque(maxlen=DataCollectionConfig.DYNAMIC_SEQUENCE_LENGTH)
         self._wrist_history = deque(maxlen=MOTION_HISTORY)
+        self._still_count = 0
 
         if not self.predictor.static_ready:
             print("Static model not loaded")
@@ -65,21 +67,30 @@ class RealtimeRecognizer:
                 landmark_array = self.detector.get_landmark_array(hand)
                 features = self.extractor.extract(landmark_array)
 
-                # Determine mode from actual wrist motion
-                wrist_xy   = (hand[0][0], hand[0][1])
+                # Always run static prediction
+                static_result = self.predictor.predict_static(landmark_array)
+
+                # Always fill the buffer — brief pauses must not clear it
+                self.buffer.append(features)
+
+                wrist_xy    = (hand[0][0], hand[0][1])
                 hand_moving = self._is_moving(wrist_xy)
 
                 if hand_moving:
+                    self._still_count = 0
                     last_mode = "DYNAMIC"
-                    self.buffer.append(features)
+                    # Run dynamic whenever the buffer is full (sliding window)
                     if len(self.buffer) == DataCollectionConfig.DYNAMIC_SEQUENCE_LENGTH:
                         sequence = np.array(self.buffer)
                         dynamic_result = self.predictor.predict_dynamic(sequence)
                 else:
-                    last_mode = "STATIC"
-                    self.buffer.clear()          # reset buffer when hand is still
-                    dynamic_result = None        # clear stale dynamic result
-                    static_result = self.predictor.predict_static(landmark_array)
+                    self._still_count += 1
+                    # Only switch to static after enough consecutive still frames
+                    if self._still_count >= STILL_FRAMES_RESET:
+                        last_mode = "STATIC"
+                        dynamic_result = None
+                        self.buffer.clear()
+                        self._still_count = 0
 
                 if InferenceConfig.DISPLAY_BBOX:
                     bbox = self._get_bbox(frame, hand)
