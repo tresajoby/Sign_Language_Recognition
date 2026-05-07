@@ -106,9 +106,14 @@ class RealtimeRecognizer:
             if InferenceConfig.DISPLAY_FPS:
                 self._draw_fps(annotated_frame, fps)
 
-            if static_result:
-                self._draw_prediction(annotated_frame, static_result[0], static_result[1],
-                                      (10, 60), (0, 200, 100))
+            if last_mode == "STATIC":
+                if static_result:
+                    self._draw_prediction(annotated_frame, static_result[0], static_result[1],
+                                          (10, 60), (0, 200, 100))
+                else:
+                    cv2.putText(annotated_frame, "Static: --", (10, 60),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                                InferenceConfig.TEXT_COLOR, 2)
             else:
                 cv2.putText(annotated_frame, "Static: --", (10, 60),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7,
