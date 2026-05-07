@@ -8,5 +8,3 @@ Pillow
 matplotlib
 seaborn
 scikit-learn
-mediapipe==0.10.14
-tensorflow==2.21.0
