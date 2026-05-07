@@ -2,7 +2,11 @@ numpy
 pandas
 opencv-python-headless
 streamlit
+streamlit-webrtc
+av
 Pillow
 matplotlib
 seaborn
 scikit-learn
+mediapipe==0.10.14
+tensorflow==2.21.0

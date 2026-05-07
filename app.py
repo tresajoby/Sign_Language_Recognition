@@ -176,32 +176,168 @@ with tab1:
 # ─────────────────────────────────────────────────────────────────────────────
 with tab2:
     st.header("Live Gesture Demo")
-    st.info(
-        "**The real-time webcam demo runs locally only.**  \n"
-        "TensorFlow and MediaPipe cannot be installed on Streamlit Cloud's free tier "
-        "(Python 3.14, no compatible wheels).  \n\n"
-        "**To run the demo on your own machine:**\n"
-        "```bash\n"
-        "git clone https://github.com/tresajoby/Sign_Language_Recognition\n"
-        "cd Sign_Language_Recognition\n"
-        "pip install tensorflow mediapipe opencv-python numpy\n"
-        "python -m src.inference.run\n"
-        "```"
+    st.markdown(
+        "Point your webcam at your hand and press **START**. "
+        "The system will detect static letters and digits, and automatically "
+        "switch to dynamic mode when it detects hand motion."
     )
 
-    st.subheader("Demo Screenshot")
-    demo_img = PLOTS / "screenshot_demo.png"
-    if demo_img.exists():
-        st.image(str(demo_img), caption="Real-time ASL recognition running locally")
-    else:
-        st.markdown("""
-        The live system displays:
-        - **Static prediction** (letter/digit) with confidence bar
-        - **Dynamic prediction** (word/motion letter) with confidence bar
-        - **Active mode** indicator (STATIC / DYNAMIC)
-        - **FPS counter** and **sequence buffer** progress
-        - **Hand landmark overlay** drawn by MediaPipe
-        """)
+    MOTION_THRESHOLD   = 0.012
+    MOTION_HISTORY     = 6
+    STILL_FRAMES_RESET = 20
+
+    try:
+        import av
+        import cv2 as _cv2
+        from collections import deque as _deque
+        from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
+
+        try:
+            from src.data_collection.hand_detector import HandDetector as _HD
+            from src.preprocessing.feature_extractor import FeatureExtractor as _FE
+            from src.inference.predictor import Predictor as _PR
+            from src.utils.config import DataCollectionConfig as _DC
+            _PIPELINE_OK = True
+        except Exception as _e:
+            _PIPELINE_OK = False
+            st.error(f"Pipeline import failed: {_e}")
+
+        if _PIPELINE_OK:
+            class ASLVideoProcessor(VideoProcessorBase):
+                def __init__(self):
+                    self.detector     = _HD()
+                    self.extractor    = _FE()
+                    self.predictor    = _PR()
+                    self.buffer       = _deque(maxlen=_DC.DYNAMIC_SEQUENCE_LENGTH)
+                    self._wrist_hist  = _deque(maxlen=MOTION_HISTORY)
+                    self._still_count = 0
+                    self.static_result  = None
+                    self.dynamic_result = None
+                    self.last_mode      = "STATIC"
+
+                def _is_moving(self, wrist_xy):
+                    self._wrist_hist.append(wrist_xy)
+                    if len(self._wrist_hist) < 2:
+                        return False
+                    pos = list(self._wrist_hist)
+                    disps = [
+                        np.hypot(pos[i][0] - pos[i-1][0], pos[i][1] - pos[i-1][1])
+                        for i in range(1, len(pos))
+                    ]
+                    return float(np.mean(disps)) > MOTION_THRESHOLD
+
+                def _bar(self, frame, x, y, conf, color):
+                    bw = int(150 * conf)
+                    _cv2.rectangle(frame, (x, y), (x + 150, y + 10), (80, 80, 80), -1)
+                    _cv2.rectangle(frame, (x, y), (x + bw,  y + 10), color,        -1)
+
+                def recv(self, frame):
+                    img = frame.to_ndarray(format="bgr24")
+                    annotated, landmarks = self.detector.detect(img)
+
+                    if landmarks:
+                        hand         = landmarks[0]
+                        lm_array     = self.detector.get_landmark_array(hand)
+                        features     = self.extractor.extract(lm_array)
+
+                        self.static_result = self.predictor.predict_static(lm_array)
+                        self.buffer.append(features)
+
+                        wrist_xy   = (hand[0][0], hand[0][1])
+                        moving     = self._is_moving(wrist_xy)
+
+                        if moving:
+                            self._still_count = 0
+                            self.last_mode    = "DYNAMIC"
+                            if len(self.buffer) == _DC.DYNAMIC_SEQUENCE_LENGTH:
+                                seq = np.array(self.buffer)
+                                self.dynamic_result = self.predictor.predict_dynamic(seq)
+                        else:
+                            self._still_count += 1
+                            if self._still_count >= STILL_FRAMES_RESET:
+                                self.last_mode      = "STATIC"
+                                self.dynamic_result = None
+                                self.buffer.clear()
+                                self._still_count   = 0
+
+                    # ── draw static row ──────────────────────────────────────
+                    if self.last_mode == "STATIC" and self.static_result:
+                        label, conf = self.static_result
+                        _cv2.putText(annotated, f"Static: {label}  {conf:.0%}",
+                                     (10, 55), _cv2.FONT_HERSHEY_SIMPLEX,
+                                     0.85, (0, 200, 100), 2)
+                        self._bar(annotated, 10, 62, conf, (0, 200, 100))
+                    else:
+                        _cv2.putText(annotated, "Static: --",
+                                     (10, 55), _cv2.FONT_HERSHEY_SIMPLEX,
+                                     0.75, (180, 180, 180), 2)
+
+                    # ── draw dynamic row ─────────────────────────────────────
+                    if self.dynamic_result:
+                        label, conf = self.dynamic_result
+                        _cv2.putText(annotated, f"Dynamic: {label}  {conf:.0%}",
+                                     (10, 105), _cv2.FONT_HERSHEY_SIMPLEX,
+                                     0.85, (200, 100, 0), 2)
+                        self._bar(annotated, 10, 112, conf, (200, 100, 0))
+                    else:
+                        _cv2.putText(annotated, "Dynamic: --",
+                                     (10, 105), _cv2.FONT_HERSHEY_SIMPLEX,
+                                     0.75, (180, 180, 180), 2)
+
+                    # ── mode indicator ───────────────────────────────────────
+                    m_color = (0, 200, 100) if self.last_mode == "STATIC" else (200, 100, 0)
+                    _cv2.putText(annotated, f"Mode: {self.last_mode}",
+                                 (10, 150), _cv2.FONT_HERSHEY_SIMPLEX,
+                                 0.65, m_color, 2)
+
+                    # ── buffer counter ───────────────────────────────────────
+                    buf = len(self.buffer)
+                    _cv2.putText(annotated, f"Buf: {buf}/{_DC.DYNAMIC_SEQUENCE_LENGTH}",
+                                 (10, 175), _cv2.FONT_HERSHEY_SIMPLEX,
+                                 0.55, (180, 180, 180), 1)
+
+                    return av.VideoFrame.from_ndarray(annotated, format="bgr24")
+
+            webrtc_streamer(
+                key="asl-live",
+                video_processor_factory=ASLVideoProcessor,
+                rtc_configuration=RTCConfiguration(
+                    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+                ),
+                media_stream_constraints={"video": True, "audio": False},
+                async_processing=True,
+            )
+
+            st.caption(
+                "**Static mode** — hold a letter (A–Y) or digit (0–9) still in front of the camera.  \n"
+                "**Dynamic mode** — sign a word (hello, thanks, please, sorry, yes, no, "
+                "help, stop, more, finish) or the letters J / Z."
+            )
+
+    except ImportError:
+        st.warning(
+            "The live demo requires **streamlit-webrtc**, **av**, **mediapipe**, and **tensorflow**.  \n"
+            "Install them and relaunch:"
+        )
+        st.code(
+            "pip install streamlit-webrtc av mediapipe==0.10.14 tensorflow==2.21.0",
+            language="bash"
+        )
+
+    st.divider()
+    st.subheader("How to run from the GitHub repository")
+    st.code(
+        "git clone https://github.com/tresajoby/Sign_Language_Recognition\n"
+        "cd Sign_Language_Recognition\n"
+        "pip install -r requirements.txt\n"
+        "streamlit run app.py",
+        language="bash"
+    )
+    st.info(
+        "For the **OpenCV standalone** inference window (full-screen, higher FPS) run:  \n"
+        "```\npython -m src.inference.run\n```  \n"
+        "Controls: **Q** quit · **R** reset buffer · **S** screenshot"
+    )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TAB 3 — About
