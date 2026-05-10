@@ -72,6 +72,9 @@ temp/
 tmp/
 *.tmp
 
+# Inference screenshots (saved by pressing S during live demo)
+docs/plots/screenshot_*.png
+
 # OS
 Thumbs.db
 .DS_Store
