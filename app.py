@@ -54,15 +54,23 @@ with tab1:
             "Train / Val / Test split: **2,309 / 496 / 495** samples."
         )
 
+    img_col1, img_col2 = st.columns(2)
+    with img_col1:
+        p = PLOTS / "confusion_matrix_static.png"
+        if p.exists():
+            st.image(str(p), caption="Confusion Matrix — Static Model", width=420)
+    with img_col2:
+        p = PLOTS / "training_history_static.png"
+        if p.exists():
+            st.image(str(p), caption="Training History — Static MLP", width=420)
+
     for img, caption in [
-        ("confusion_matrix_static.png",  "Confusion Matrix — Static Model"),
-        ("per_class_accuracy_static.png","Per-Class Accuracy — Static Model"),
-        ("error_analysis_static.png",    "Error Analysis — Static Model"),
-        ("training_history_static.png",  "Training History — Static MLP"),
+        ("per_class_accuracy_static.png", "Per-Class Accuracy — Static Model"),
+        ("error_analysis_static.png",     "Error Analysis — Static Model"),
     ]:
         p = PLOTS / img
         if p.exists():
-            st.image(str(p), caption=caption)
+            st.image(str(p), caption=caption, width=600)
 
     st.divider()
 
@@ -83,15 +91,23 @@ with tab1:
             "Train / Val / Test split: **840 / 180 / 180** sequences."
         )
 
+    img_col3, img_col4 = st.columns(2)
+    with img_col3:
+        p = PLOTS / "confusion_matrix_dynamic.png"
+        if p.exists():
+            st.image(str(p), caption="Confusion Matrix — Dynamic Model", width=420)
+    with img_col4:
+        p = PLOTS / "training_history_dynamic.png"
+        if p.exists():
+            st.image(str(p), caption="Training History — Dynamic BiLSTM", width=420)
+
     for img, caption in [
-        ("confusion_matrix_dynamic.png",  "Confusion Matrix — Dynamic Model"),
-        ("per_class_accuracy_dynamic.png","Per-Class Accuracy — Dynamic Model"),
-        ("error_analysis_dynamic.png",    "Error Analysis — Dynamic Model"),
-        ("training_history_dynamic.png",  "Training History — Dynamic BiLSTM"),
+        ("per_class_accuracy_dynamic.png", "Per-Class Accuracy — Dynamic Model"),
+        ("error_analysis_dynamic.png",     "Error Analysis — Dynamic Model"),
     ]:
         p = PLOTS / img
         if p.exists():
-            st.image(str(p), caption=caption)
+            st.image(str(p), caption=caption, width=600)
 
     st.divider()
 

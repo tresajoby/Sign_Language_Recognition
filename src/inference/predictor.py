@@ -49,8 +49,8 @@ class Predictor:
         if not self.static_ready:
             return None
         features = self.feature_extractor.extract(landmark_array_63)
-        x = features.reshape(1, -1)
-        probs = self.static_model.predict(x, verbose=0)[0]
+        x = features.reshape(1, -1).astype(np.float32)
+        probs = self.static_model(x, training=False).numpy()[0]
         idx = int(np.argmax(probs))
         confidence = float(probs[idx])
         if confidence < InferenceConfig.CONFIDENCE_THRESHOLD:
@@ -61,8 +61,8 @@ class Predictor:
     def predict_dynamic(self, sequence):
         if not self.dynamic_ready:
             return None
-        x = np.array(sequence).reshape(1, sequence.shape[0], sequence.shape[1])
-        probs = self.dynamic_model.predict(x, verbose=0)[0]
+        x = np.array(sequence, dtype=np.float32).reshape(1, sequence.shape[0], sequence.shape[1])
+        probs = self.dynamic_model(x, training=False).numpy()[0]
         idx = int(np.argmax(probs))
         confidence = float(probs[idx])
         if confidence < InferenceConfig.CONFIDENCE_THRESHOLD:

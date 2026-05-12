@@ -54,7 +54,7 @@ class MediaPipeConfig:
     # Model complexity (0 or 1)
     # 0 = Lite model (faster, less accurate)
     # 1 = Full model (slower, more accurate)
-    MODEL_COMPLEXITY = 1
+    MODEL_COMPLEXITY = 0
 
 
 # ============================================================================

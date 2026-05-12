@@ -11,9 +11,14 @@ from src.preprocessing.feature_extractor import FeatureExtractor
 from src.inference.predictor import Predictor
 
 
-MOTION_THRESHOLD    = 0.012  # normalised units; lower = more sensitive
+MOTION_THRESHOLD    = 0.008  # normalised units; lower = more sensitive
 MOTION_HISTORY      = 6      # frames to average wrist displacement over
+# Fingertip + wrist landmark indices (MediaPipe): thumb, index, middle, ring, pinky tips + wrist
+KEY_LANDMARK_IDX    = [0, 4, 8, 12, 16, 20]
 STILL_FRAMES_RESET  = 20     # consecutive still frames before switching to static
+DETECT_EVERY        = 2      # run MediaPipe every N frames, cache landmarks between
+STATIC_INFER_EVERY  = 2      # run static MLP every N frames
+DYNAMIC_INFER_EVERY = 3      # run dynamic BiLSTM every N frames
 
 
 class RealtimeRecognizer:
@@ -25,24 +30,33 @@ class RealtimeRecognizer:
         self.buffer = deque(maxlen=DataCollectionConfig.DYNAMIC_SEQUENCE_LENGTH)
         self._wrist_history = deque(maxlen=MOTION_HISTORY)
         self._still_count = 0
+        self._frame_count = 0
+        self._cached_landmarks = None  # reused between detection frames
 
         if not self.predictor.static_ready:
             print("Static model not loaded")
         if not self.predictor.dynamic_ready:
             print("Dynamic model not loaded")
 
-    def _is_moving(self, wrist_xy):
-        """Return True when average wrist displacement exceeds MOTION_THRESHOLD."""
-        self._wrist_history.append(wrist_xy)
+    def _is_moving(self, key_points):
+        """Return True when average displacement of fingertips + wrist exceeds threshold.
+
+        Tracks 6 key landmarks so finger-only motion (e.g. 'no', 'yes') is caught
+        even when the wrist stays mostly still.
+        """
+        self._wrist_history.append(key_points)
         if len(self._wrist_history) < 2:
             return False
-        positions = list(self._wrist_history)
-        displacements = [
-            np.hypot(positions[i][0] - positions[i-1][0],
-                     positions[i][1] - positions[i-1][1])
-            for i in range(1, len(positions))
+        frames = list(self._wrist_history)
+        per_frame_disp = [
+            float(np.mean([
+                np.hypot(frames[i][k][0] - frames[i-1][k][0],
+                         frames[i][k][1] - frames[i-1][k][1])
+                for k in range(len(KEY_LANDMARK_IDX))
+            ]))
+            for i in range(1, len(frames))
         ]
-        return float(np.mean(displacements)) > MOTION_THRESHOLD
+        return float(np.mean(per_frame_disp)) > MOTION_THRESHOLD
 
     def run(self):
         cap = cv2.VideoCapture(DataCollectionConfig.CAMERA_ID)
@@ -60,32 +74,38 @@ class RealtimeRecognizer:
             if not ret:
                 break
 
-            annotated_frame, landmarks = self.detector.detect(frame)
+            self._frame_count += 1
+
+            # Run MediaPipe every DETECT_EVERY frames; reuse cached landmarks in between
+            if self._frame_count % DETECT_EVERY == 0:
+                annotated_frame, landmarks = self.detector.detect(frame)
+                self._cached_landmarks = landmarks
+            else:
+                annotated_frame = frame
+                landmarks = self._cached_landmarks
 
             if landmarks:
-                hand = landmarks[0]  # first hand — list of 21 (x,y,z) tuples
+                hand = landmarks[0]
                 landmark_array = self.detector.get_landmark_array(hand)
                 features = self.extractor.extract(landmark_array)
 
-                # Always run static prediction
-                static_result = self.predictor.predict_static(landmark_array)
+                if self._frame_count % STATIC_INFER_EVERY == 0:
+                    static_result = self.predictor.predict_static(landmark_array)
 
-                # Always fill the buffer — brief pauses must not clear it
                 self.buffer.append(features)
 
-                wrist_xy    = (hand[0][0], hand[0][1])
-                hand_moving = self._is_moving(wrist_xy)
+                key_points  = [(hand[i][0], hand[i][1]) for i in KEY_LANDMARK_IDX]
+                hand_moving = self._is_moving(key_points)
 
                 if hand_moving:
                     self._still_count = 0
                     last_mode = "DYNAMIC"
-                    # Run dynamic whenever the buffer is full (sliding window)
-                    if len(self.buffer) == DataCollectionConfig.DYNAMIC_SEQUENCE_LENGTH:
+                    if (len(self.buffer) == DataCollectionConfig.DYNAMIC_SEQUENCE_LENGTH
+                            and self._frame_count % DYNAMIC_INFER_EVERY == 0):
                         sequence = np.array(self.buffer)
                         dynamic_result = self.predictor.predict_dynamic(sequence)
                 else:
                     self._still_count += 1
-                    # Only switch to static after enough consecutive still frames
                     if self._still_count >= STILL_FRAMES_RESET:
                         last_mode = "STATIC"
                         dynamic_result = None
@@ -103,40 +123,8 @@ class RealtimeRecognizer:
             fps = 1.0 / max(now - prev_time, 1e-6)
             prev_time = now
 
-            if InferenceConfig.DISPLAY_FPS:
-                self._draw_fps(annotated_frame, fps)
-
-            if last_mode == "STATIC":
-                if static_result:
-                    self._draw_prediction(annotated_frame, static_result[0], static_result[1],
-                                          (10, 60), (0, 200, 100))
-                else:
-                    cv2.putText(annotated_frame, "Static: --", (10, 60),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                                InferenceConfig.TEXT_COLOR, 2)
-            else:
-                cv2.putText(annotated_frame, "Static: --", (10, 60),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            InferenceConfig.TEXT_COLOR, 2)
-
-            if dynamic_result:
-                self._draw_prediction(annotated_frame, dynamic_result[0], dynamic_result[1],
-                                      (10, 110), (200, 100, 0))
-            else:
-                cv2.putText(annotated_frame, "Dynamic: --", (10, 110),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            InferenceConfig.TEXT_COLOR, 2)
-
-            mode_color = (0, 200, 100) if last_mode == "STATIC" else (200, 100, 0)
-            cv2.putText(annotated_frame, f"Mode: {last_mode}", (10, 155),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, mode_color, 2)
-
-            buf_count = len(self.buffer)
-            buf_max = DataCollectionConfig.DYNAMIC_SEQUENCE_LENGTH
-            cv2.putText(annotated_frame, f"Buf: {buf_count}/{buf_max}",
-                        (DataCollectionConfig.FRAME_WIDTH - 130, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.55,
-                        InferenceConfig.TEXT_COLOR, 1)
+            self._draw_info_panel(annotated_frame, fps, last_mode,
+                                  static_result, dynamic_result)
 
             cv2.imshow("ASL Recognition", annotated_frame)
 
@@ -157,23 +145,55 @@ class RealtimeRecognizer:
         cap.release()
         cv2.destroyAllWindows()
 
-    def _draw_prediction(self, frame, label, confidence, position, color):
-        x, y = position
-        text = f"{label}: {confidence:.0%}"
-        cv2.putText(frame, text, (x, y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, InferenceConfig.TEXT_COLOR, 2)
+    # ------------------------------------------------------------------
+    # Drawing helpers
+    # ------------------------------------------------------------------
 
-        bar_x = x
-        bar_y = y + 6
-        bar_w = 150
-        bar_h = 10
-        filled_w = int(bar_w * confidence)
-        cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (80, 80, 80), -1)
-        cv2.rectangle(frame, (bar_x, bar_y), (bar_x + filled_w, bar_y + bar_h), color, -1)
+    def _draw_info_panel(self, frame, fps, mode, static_result, dynamic_result):
+        panel_x, panel_y = 8, 8
+        panel_w, panel_h = 260, 175
 
-    def _draw_fps(self, frame, fps):
-        cv2.putText(frame, f"FPS: {fps:.1f}", (10, 25),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, InferenceConfig.TEXT_COLOR, 2)
+        # Blend only the panel ROI — cheap because it's a small region, not the full frame
+        roi = frame[panel_y:panel_y + panel_h, panel_x:panel_x + panel_w]
+        dark = np.zeros_like(roi)
+        dark[:] = (30, 30, 30)
+        cv2.addWeighted(dark, 0.55, roi, 0.45, 0, roi)
+
+        if InferenceConfig.DISPLAY_FPS:
+            cv2.putText(frame, f"FPS: {fps:.1f}", (panel_x + 8, panel_y + 22),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (180, 180, 180), 1)
+
+        mode_color = (0, 210, 110) if mode == "STATIC" else (60, 140, 255)
+        cv2.putText(frame, f"Mode: {mode}", (panel_x + 8, panel_y + 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, mode_color, 2)
+
+        result     = static_result if mode == "STATIC" else dynamic_result
+        pred_color = (0, 230, 120) if mode == "STATIC" else (80, 160, 255)
+
+        if result:
+            label, confidence = result
+            cv2.putText(frame, label, (panel_x + 8, panel_y + 110),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.8, pred_color, 3)
+            cv2.putText(frame, f"{confidence:.0%}", (panel_x + 8, panel_y + 138),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, (200, 200, 200), 1)
+            bar_x     = panel_x + 8
+            bar_y     = panel_y + 148
+            bar_w     = panel_w - 20
+            bar_h     = 10
+            filled_w  = int(bar_w * confidence)
+            cv2.rectangle(frame, (bar_x, bar_y),
+                          (bar_x + bar_w, bar_y + bar_h), (60, 60, 60), -1)
+            cv2.rectangle(frame, (bar_x, bar_y),
+                          (bar_x + filled_w, bar_y + bar_h), pred_color, -1)
+        else:
+            cv2.putText(frame, "--", (panel_x + 8, panel_y + 110),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.8, (100, 100, 100), 3)
+
+        buf_count = len(self.buffer)
+        buf_max   = DataCollectionConfig.DYNAMIC_SEQUENCE_LENGTH
+        cv2.putText(frame, f"Buf {buf_count}/{buf_max}",
+                    (DataCollectionConfig.FRAME_WIDTH - 110, 22),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (160, 160, 160), 1)
 
     def _get_bbox(self, frame, landmarks_raw):
         h, w = frame.shape[:2]
